@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configuração de Origens Incluídas</title>
+  <style>
+    :root {
+      --cor-primaria: #007bff;
+      --cor-primaria-hover: #0056b3;
+      --cor-fundo: #f8f9fa;
+      --cor-card: #ffffff;
+      --cor-texto: #212529;
+      --cor-label: #495057;
+      --cor-borda: #dee2e6;
+      --cor-sucesso: #28a745;
+      --cor-perigo: #dc3545;
+      --sombra: 0 4px 12px rgba(0, 0, 0, 0.05);
+      --border-radius: 8px;
+      --transition-speed: 0.2s;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 40px 20px;
+      background-color: var(--cor-fundo);
+      color: var(--cor-texto);
+      line-height: 1.6;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: auto;
+    }
+    
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+    
+    h1 {
+      color: var(--cor-texto);
+      margin: 0;
+    }
+    
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 15px;
+      background: white;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      box-shadow: var(--sombra);
+    }
+    
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: var(--cor-sucesso);
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .btn-logout {
+      background-color: #6c757d;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      text-decoration: none;
+      transition: background-color 0.2s;
+    }
+    
+    .btn-logout:hover {
+      background-color: #5a6268;
+    }
+    
+    .flash {
+      padding: 15px 20px;
+      margin-bottom: 20px;
+      border: 1px solid transparent;
+      border-radius: var(--border-radius);
+      font-size: 1rem;
+      animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .flash.success {
+      background-color: #d1e7dd;
+      color: #0f5132;
+      border-color: #badbcc;
+    }
+    
+    .flash.error {
+      background-color: #f8d7da;
+      color: #842029;
+      border-color: #f5c2c7;
+    }
+    
+    .flash.warning {
+      background-color: #fff3cd;
+      color: #856404;
+      border-color: #ffeeba;
+    }
+    
+    .config-section {
+      background-color: var(--cor-card);
+      border-radius: var(--border-radius);
+      box-shadow: var(--sombra);
+      margin-bottom: 25px;
+      overflow: hidden;
+    }
+    
+    .config-section h3 {
+      background-color: rgba(0, 0, 0, 0.03);
+      border-bottom: 1px solid var(--cor-borda);
+      padding: 15px 25px;
+      margin: 0;
+      font-size: 1.25rem;
+      color: var(--cor-primaria);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .origem-counter {
+      background-color: var(--cor-primaria);
+      color: white;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    
+    .form-content {
+      padding: 25px;
+    }
+    
+    .add-origem-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 25px;
+    }
+    
+    .add-origem-input {
+      flex: 1;
+      padding: 12px 15px;
+      border: 1px solid var(--cor-borda);
+      border-radius: 6px;
+      font-size: 1rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    
+    .add-origem-input:focus {
+      outline: none;
+      border-color: var(--cor-primaria);
+      box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.2);
+    }
+    
+    .btn-add {
+      background-color: var(--cor-sucesso);
+      color: white;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 600;
+      transition: background-color 0.2s;
+      white-space: nowrap;
+    }
+    
+    .btn-add:hover {
+      background-color: #218838;
+    }
+    
+    .origens-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    
+    .origem-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 15px;
+      margin-bottom: 8px;
+      background-color: #f8f9fa;
+      border: 1px solid var(--cor-borda);
+      border-radius: 6px;
+      transition: all 0.2s;
+      animation: fadeIn 0.3s ease-out;
+    }
+    
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateX(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    
+    .origem-item:hover {
+      background-color: #e9ecef;
+      border-color: #adb5bd;
+    }
+    
+    .origem-text {
+      flex: 1;
+      font-size: 0.95rem;
+      color: var(--cor-texto);
+    }
+    
+    .btn-remove {
+      background-color: var(--cor-perigo);
+      color: white;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background-color 0.2s;
+    }
+    
+    .btn-remove:hover {
+      background-color: #c82333;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #6c757d;
+    }
+    
+    .empty-state-icon {
+      font-size: 3rem;
+      margin-bottom: 10px;
+    }
+    
+    .save-button-container {
+      margin-top: 30px;
+    }
+    
+    .btn-save {
+      width: 100%;
+      background-color: var(--cor-primaria);
+      color: white;
+      padding: 16px 20px;
+      border: none;
+      border-radius: var(--border-radius);
+      cursor: pointer;
+      font-size: 1.1rem;
+      font-weight: 600;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+    
+    .btn-save:hover {
+      background-color: var(--cor-primaria-hover);
+    }
+    
+    .btn-save:active {
+      transform: scale(0.98);
+    }
+    
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 20px;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 1000;
+      animation: slideInRight 0.3s ease-out;
+      max-width: 350px;
+    }
+    
+    @keyframes slideInRight {
+      from {
+        opacity: 0;
+        transform: translateX(100px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    
+    .toast.success {
+      background-color: var(--cor-sucesso);
+      color: white;
+    }
+    
+    .toast.error {
+      background-color: var(--cor-perigo);
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>⚙️ Configuração de Origens</h1>
+      <div class="header-actions">
+        <div class="status-indicator">
+          <span class="status-dot"></span>
+          <span id="origem-count">{{ origens|length }} origens</span>
+        </div>
+        <a href="{{ url_for('logout') }}" class="btn-logout">Sair</a>
+      </div>
+    </header>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+      {% endfor %}
+      {% endif %}
+    {% endwith %}
+    
+    <section class="config-section">
+      <h3>
+        Lista de Origens Incluídas
+        <span class="origem-counter" id="counter-badge">{{ origens|length }}</span>
+      </h3>
+      
+      <div class="form-content">
+        <div class="add-origem-group">
+          <input 
+            type="text" 
+            id="novaOrigem" 
+            class="add-origem-input" 
+            placeholder="Digite o nome da origem e pressione Enter ou clique em Adicionar..."
+            autocomplete="off"
+          >
+          <button type="button" class="btn-add" onclick="addOrigem()">➕ Adicionar</button>
+        </div>
+        
+        <ul class="origens-list" id="origensList">
+          {% if origens %}
+            {% for origem in origens %}
+            <li class="origem-item" data-index="{{ loop.index0 }}">
+              <span class="origem-text">{{ origem }}</span>
+              <button type="button" class="btn-remove" onclick="removeOrigem({{ loop.index0 }})">✕ Remover</button>
+            </li>
+            {% endfor %}
+          {% else %}
+            <div class="empty-state">
+              <div class="empty-state-icon">📭</div>
+              <p>Nenhuma origem configurada ainda.</p>
+              <p>Adicione origens para começar a filtrar as notificações.</p>
+            </div>
+          {% endif %}
+        </ul>
+      </div>
+    </section>
+    
+    <form method="post" id="saveForm">
+      <input type="hidden" name="origens" id="origensHidden">
+      <div class="save-button-container">
+        <button type="submit" class="btn-save">💾 Salvar Alterações</button>
+      </div>
+    </form>
+  </div>
+  
+  <script>
+    let origens = {{ origens|tojson }};
+    
+    function updateUI() {
+      const list = document.getElementById('origensList');
+      const counter = document.getElementById('counter-badge');
+      const headerCount = document.getElementById('origem-count');
+      
+      counter.textContent = origens.length;
+      headerCount.textContent = `${origens.length} origens`;
+      
+      if (origens.length === 0) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📭</div>
+            <p>Nenhuma origem configurada ainda.</p>
+            <p>Adicione origens para começar a filtrar as notificações.</p>
+          </div>
+        `;
+      } else {
+        list.innerHTML = origens.map((origem, index) => `
+          <li class="origem-item" data-index="${index}">
+            <span class="origem-text">${escapeHtml(origem)}</span>
+            <button type="button" class="btn-remove" onclick="removeOrigem(${index})">✕ Remover</button>
+          </li>
+        `).join('');
+      }
+    }
+    
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    function showToast(message, type = 'success') {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+    
+    function addOrigem() {
+      const input = document.getElementById('novaOrigem');
+      const novaOrigem = input.value.trim();
+      
+      if (!novaOrigem) {
+        showToast('Por favor, digite uma origem válida', 'error');
+        return;
+      }
+      
+      if (origens.includes(novaOrigem)) {
+        showToast('Esta origem já está na lista', 'error');
+        input.select();
+        return;
+      }
+      
+      origens.push(novaOrigem);
+      input.value = '';
+      input.focus();
+      updateUI();
+      showToast('Origem adicionada! Não esqueça de salvar.', 'success');
+    }
+    
+    function removeOrigem(index) {
+      if (confirm(`Deseja remover "${origens[index]}"?`)) {
+        const removed = origens.splice(index, 1)[0];
+        updateUI();
+        showToast(`Origem "${removed}" removida! Não esqueça de salvar.`, 'success');
+      }
+    }
+    
+    // Enter key para adicionar
+    document.getElementById('novaOrigem').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addOrigem();
+      }
+    });
+    
+    // Atualiza o campo hidden antes de submeter
+    document.getElementById('saveForm').addEventListener('submit', function(e) {
+      const hidden = document.getElementById('origensHidden');
+      hidden.value = origens.join('\n');
+    });
+    
+    // Auto-focus no input ao carregar
+    window.addEventListener('load', function() {
+      document.getElementById('novaOrigem').focus();
+    });
+  </script>
+</body>
+</html>
