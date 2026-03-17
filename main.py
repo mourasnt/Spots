@@ -7,6 +7,7 @@ import sqlite3
 import json
 import requests
 import threading
+import traceback
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from google.auth.transport.requests import Request
@@ -34,7 +35,7 @@ config_lock = threading.Lock()
 # --- Filtros ---
 remetente_procurado = "operacao@3zx.com.br"
 assunto_procurado = "ATENÇÃO: a sua transportadora tem uma viagem de leilão com a Shopee"
-minutos_para_filtrar = 60
+minutos_para_filtrar = 240
 filtro_de_tempo_api = "3d" # Busca e-mails dos últimos 2 dias (API)
 agora_utc = datetime.datetime.now(timezone.utc)
 # Filtro local: E-mails devem ser mais novos que 60 min atrás
@@ -181,7 +182,7 @@ def obter_dimensionamento():
         return None
 
 def envia_mensagem(MESSAGE):
-    API_URL = "http://evolution_api:8080" 
+    API_URL = "http://127.0.0.1:8080" 
     INSTANCE_NAME = "Spots" 
     API_KEY = "Senh@Segura123"
 
@@ -244,6 +245,7 @@ def main():
     conn.close() # Fechamos a conexão por enquanto
 
     while True:
+        print(f"DEBUG: Início do loop principal. token existe={os.path.exists(TOKEN_FILE)}, credentials existe={os.path.exists(CREDENTIALS_FILE)}")
         # --- BLOCO DE AUTENTICAÇÃO CORRIGIDO ---
         creds = None
         # O arquivo token.json armazena os tokens de acesso e atualização do usuário.
@@ -274,9 +276,18 @@ def main():
                     if not os.path.exists(CREDENTIALS_FILE):
                         print(f"ERRO FATAL: Arquivo '{CREDENTIALS_FILE}' não encontrado.")
                         print("Faça o download do JSON de credenciais do Google Cloud Console.")
-                        return # Sai do programa
+                        print("Continuando em loop para nova tentativa em 60s...")
+                        time.sleep(60)
+                        continue
 
                     print(f"Arquivo '{TOKEN_FILE}' não encontrado ou inválido. Iniciando nova autenticação...")
+
+                    # Em containers, o fluxo interativo pode não funcionar.
+                    if os.environ.get('GMAIL_NO_INTERACTIVE', 'false').lower() in ['1','true','yes']:
+                        print('Modo NÃO interativo ativo: não será aberto browser. Verifique token.json manualmente.')
+                        time.sleep(60)
+                        continue
+
                     flow = InstalledAppFlow.from_client_secrets_file(
                         CREDENTIALS_FILE, SCOPES)
                     # port=0 faz a biblioteca encontrar uma porta livre
@@ -284,11 +295,22 @@ def main():
                     print("Autenticação realizada com sucesso!")
                 except Exception as e:
                     print(f"Erro durante o fluxo de autenticação: {e}")
-                    return # Sai do programa
+                    if os.environ.get('GMAIL_NO_INTERACTIVE', 'false').lower() in ['1','true','yes']:
+                        print('Falha no fluxo OAuth interativo em modo não interativo, aguardando 60s e tentando novamente...')
+                        time.sleep(60)
+                        continue
+                    else:
+                        print('Saindo do processador principal por falha de autenticação.')
+                        return
 
             # Salva as novas credenciais (token.json) para a próxima execução
-            with open(TOKEN_FILE, 'w') as token:
-                token.write(creds.to_json())
+            if creds:
+                with open(TOKEN_FILE, 'w') as token:
+                    token.write(creds.to_json())
+            else:
+                print('Não foi possível obter credenciais válidas, esperando 60s para retry...')
+                time.sleep(60)
+                continue
         # --- FIM DO BLOCO DE AUTENTICAÇÃO ---
 
         try:
@@ -462,12 +484,14 @@ def main():
 
         except HttpError as error:
             print(f'Ocorreu um erro na API: {error}')
+            traceback.print_exc()
             if error.resp.status == 401 or error.resp.status == 403:
                 print("Erro de autenticação. Removendo token.json para forçar novo login no próximo loop.")
                 if os.path.exists(TOKEN_FILE):
                     os.remove(TOKEN_FILE)
         except Exception as e:
             print(f'Ocorreu um erro inesperado: {e}')
+            traceback.print_exc()
 
         print(f"Aguardando 60 segundos antes da próxima verificação...")
         time.sleep(60)

@@ -24,8 +24,8 @@ RUN mkdir -p templates
 # Expõe a porta do Flask
 EXPOSE 5000
 
-# Torna o script de entrada executável
-RUN chmod +x /app/entrypoint.sh
+# Normaliza final de linha e garante permissões
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Define o script de entrada
 ENTRYPOINT ["/app/entrypoint.sh"]
