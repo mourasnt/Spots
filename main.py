@@ -390,7 +390,7 @@ def main():
                                     numero_viagem = celulas[1].get_text(strip=True).strip()
                                     origem = celulas[2].get_text(strip=True).split("]")[1].strip()
                                     destino = celulas[3].get_text(strip=True).split("]")[1].strip()
-                                    eta_origem = celulas[4].get_text(strip=True).strip()
+                                    eta_origem = celulas[4].get_text(strip=True).strip().replace("-", "/")
                                     veiculo = celulas[5].get_text(strip=True).strip()
 
                                     regular = 0
