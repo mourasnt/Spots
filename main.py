@@ -1,3 +1,4 @@
+import os
 import os.path
 import datetime
 import random
@@ -63,37 +64,42 @@ def load_config():
             origens_incluidas = []
 
 def setup_database():
-    try:
-        conn = sqlite3.connect(DATABASE_FILE)
-        cursor = conn.cursor()
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS leiloes (
-            gmail_message_id TEXT PRIMARY KEY,
-            hora_recebida TIMESTAMP,
-            assunto TEXT,
-            nome_viagem TEXT,
-            numero_viagem TEXT,
-            estacao_partida TEXT,
-            estacao_chegada TEXT,
-            eta_origem TEXT,
-            veiculo TEXT
-        )
-        ''')
-        conn.commit()
-        conn.close()
-        print(f"Base de dados '{DATABASE_FILE}' pronta.")
-    except Exception as e:
-        print(f"Erro ao configurar a base de dados: {e}")
+    """Garante a criação do arquivo e da tabela, evitando erros de abertura."""
+    # Garante que a pasta onde o banco vai ficar exista
+    db_dir = os.path.dirname(os.path.abspath(DATABASE_FILE))
+    if not os.path.exists(db_dir):
+        os.makedirs(db_dir, exist_ok=True)
 
-def get_existing_ids(conn):
-    """Lê o banco de dados e retorna um SET com todos os IDs já processados."""
     try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT gmail_message_id FROM leiloes")
-        # Usamos um 'set comprehension' para performance máxima de lookup
-        ids_existentes = {row[0] for row in cursor.fetchall()}
-        print(f"Encontrados {len(ids_existentes)} e-mails já processados no banco de dados.")
-        return ids_existentes
+        # O timeout de 10s evita que ele falhe se o arquivo estiver ocupado
+        with sqlite3.connect(DATABASE_FILE, timeout=10.0) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS leiloes (
+                gmail_message_id TEXT PRIMARY KEY,
+                hora_recebida TIMESTAMP,
+                assunto TEXT,
+                nome_viagem TEXT,
+                numero_viagem TEXT,
+                estacao_partida TEXT,
+                estacao_chegada TEXT,
+                eta_origem TEXT,
+                veiculo TEXT
+            )
+            ''')
+        print(f"✓ Base de dados '{DATABASE_FILE}' pronta.")
+    except Exception as e:
+        print(f"❌ Erro ao configurar a base de dados: {e}")
+
+def get_existing_ids():
+    """Lê o banco de dados de forma segura e retorna os IDs já processados."""
+    try:
+        with sqlite3.connect(DATABASE_FILE, timeout=10.0) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT gmail_message_id FROM leiloes")
+            ids_existentes = {row[0] for row in cursor.fetchall()}
+            print(f"Encontrados {len(ids_existentes)} e-mails já processados no banco de dados.")
+            return ids_existentes
     except Exception as e:
         print(f"Erro ao ler IDs existentes: {e}")
         return set() # Retorna um set vazio em caso de erro
@@ -187,7 +193,6 @@ def envia_mensagem(MESSAGE):
     API_KEY = "Senh@Segura123"
 
     DESTINATION_NUMBER = "120363421560093254@g.us"
-    # DESTINATION_NUMBER = "120363421560093254@g.us" 
 
     # Monta a URL completa do endpoint para enviar texto
     url_endpoint = f"{API_URL}/message/sendText/{INSTANCE_NAME}"
@@ -212,10 +217,7 @@ def envia_mensagem(MESSAGE):
     print(f"Enviando mensagem para: {DESTINATION_NUMBER}...")
 
     try:
-        # Usamos json.dumps() para converter o dicionário Python em uma string JSON
         response = requests.post(url_endpoint, headers=headers, data=json.dumps(payload))
-
-        # Lança um erro se a requisição falhar (status code 4xx ou 5xx)
         response.raise_for_status() 
 
         print("✅ Mensagem enviada com sucesso!")
@@ -239,16 +241,13 @@ def envia_mensagem(MESSAGE):
 def main():
     setup_database()
 
-    # Conectar ao DB uma vez no início
-    conn = sqlite3.connect(DATABASE_FILE)
-    ids_ja_processados = get_existing_ids(conn)
-    conn.close() # Fechamos a conexão por enquanto
+    # Carrega os IDs já existentes (agora sem precisar passar 'conn')
+    ids_ja_processados = get_existing_ids()
 
     while True:
         print(f"DEBUG: Início do loop principal. token existe={os.path.exists(TOKEN_FILE)}, credentials existe={os.path.exists(CREDENTIALS_FILE)}")
-        # --- BLOCO DE AUTENTICAÇÃO CORRIGIDO ---
+        # --- BLOCO DE AUTENTICAÇÃO ---
         creds = None
-        # O arquivo token.json armazena os tokens de acesso e atualização do usuário.
         if os.path.exists(TOKEN_FILE):
             try:
                 creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
@@ -257,7 +256,6 @@ def main():
                 os.remove(TOKEN_FILE)
                 creds = None
 
-        # Se não houver credenciais (válidas), deixa o usuário fazer login.
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 try:
@@ -267,11 +265,9 @@ def main():
                     print(f"Não foi possível atualizar o token: {e}")
                     print("Por favor, autentique-se novamente.")
                     if os.path.exists(TOKEN_FILE):
-                        os.remove(TOKEN_FILE) # Remove o token inválido
-                    creds = None # Força nova autenticação
+                        os.remove(TOKEN_FILE) 
+                    creds = None 
             else:
-                # Se não existe token.json ou o refresh falhou,
-                # inicia o fluxo de autenticação do zero.
                 try:
                     if not os.path.exists(CREDENTIALS_FILE):
                         print(f"ERRO FATAL: Arquivo '{CREDENTIALS_FILE}' não encontrado.")
@@ -282,7 +278,6 @@ def main():
 
                     print(f"Arquivo '{TOKEN_FILE}' não encontrado ou inválido. Iniciando nova autenticação...")
 
-                    # Em containers, o fluxo interativo pode não funcionar.
                     if os.environ.get('GMAIL_NO_INTERACTIVE', 'false').lower() in ['1','true','yes']:
                         print('Modo NÃO interativo ativo: não será aberto browser. Verifique token.json manualmente.')
                         time.sleep(60)
@@ -290,7 +285,6 @@ def main():
 
                     flow = InstalledAppFlow.from_client_secrets_file(
                         CREDENTIALS_FILE, SCOPES)
-                    # port=0 faz a biblioteca encontrar uma porta livre
                     creds = flow.run_local_server(port=0) 
                     print("Autenticação realizada com sucesso!")
                 except Exception as e:
@@ -303,7 +297,6 @@ def main():
                         print('Saindo do processador principal por falha de autenticação.')
                         return
 
-            # Salva as novas credenciais (token.json) para a próxima execução
             if creds:
                 with open(TOKEN_FILE, 'w') as token:
                     token.write(creds.to_json())
@@ -323,7 +316,6 @@ def main():
             service = build('gmail', 'v1', credentials=creds)
             print("Conectado à API do Gmail (Servidor) com sucesso!")
 
-            # Atualiza o filtro de tempo a cada loop
             agora_utc = datetime.datetime.now(timezone.utc)
             limite_de_tempo = agora_utc - timedelta(minutes=minutos_para_filtrar)
 
@@ -334,7 +326,6 @@ def main():
             )
 
             print(f"\n[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Procurando e-mails...")
-            # print(f"Query: {query}")
             response = service.users().messages().list(userId='me', q=query).execute()
             messages = response.get('messages', [])
 
@@ -366,7 +357,7 @@ def main():
                         internal_date_ms = int(msg['internalDate'])
                         msg_date = datetime.datetime.fromtimestamp(internal_date_ms / 1000.0, tz=timezone.utc)
 
-                        # Aplicamos o filtro local de 15 minutos
+                        # Aplicamos o filtro local
                         if msg_date < limite_de_tempo:
                             continue
 
@@ -395,11 +386,10 @@ def main():
 
                                     regular = 0
                                     print(origem + " | " + destino)
-                                    # Usa a variável global (atualizada pelo file watcher)
+                                    
                                     with config_lock:
                                         origens_atuais = origens_incluidas.copy()
 
-                                    # Verifica contra a lista combinada de rotas com status
                                     rota_email = (origem.strip() + " | " + destino.strip())
                                     print(f"Verificando rota: {rota_email}")
                                     
@@ -419,27 +409,26 @@ def main():
                                         print(f"✗ Rota não incluída, ignorando...")
                                         continue
 
-                                    # --- INSERÇÃO NO SQLITE ---
+                                    # --- INSERÇÃO SEGURA NO SQLITE ---
                                     try:
-                                        conn = sqlite3.connect(DATABASE_FILE)
-                                        cursor = conn.cursor()
                                         dados_para_inserir = (
                                             msg_id, msg_date, subject_header,
                                             nome_viagem, numero_viagem, origem,
                                             destino, eta_origem, veiculo
                                         )
-                                        # Usamos INSERT normal (pois já verificámos o ID)
-                                        cursor.execute('''
-                                        INSERT INTO leiloes (
-                                            gmail_message_id, hora_recebida, assunto,
-                                            nome_viagem, numero_viagem, estacao_partida,
-                                            estacao_chegada, eta_origem, veiculo
-                                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                        ''', dados_para_inserir)
-                                        conn.commit()
-                                        conn.close()
-
-                                        # Formata a mensagem para envio
+                                        
+                                        # O 'with' gerencia a abertura, o commit e o fechamento sozinho!
+                                        with sqlite3.connect(DATABASE_FILE, timeout=10.0) as conn:
+                                            cursor = conn.cursor()
+                                            cursor.execute('''
+                                            INSERT INTO leiloes (
+                                                gmail_message_id, hora_recebida, assunto,
+                                                nome_viagem, numero_viagem, estacao_partida,
+                                                estacao_chegada, eta_origem, veiculo
+                                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                            ''', dados_para_inserir)
+                                        
+                                        # Formata e envia a mensagem apenas se inseriu no BD com sucesso
                                         msg_date_sp = msg_date.astimezone(ZoneInfo("America/Sao_Paulo"))
                                         mensagem_formatada = (
                                             f"🚨 *Novo Spot recebido* 🚨\n"
@@ -450,6 +439,7 @@ def main():
                                             f"*Perfil:* {veiculo}\n"
                                             f"`Recebido: {msg_date_sp.strftime('%d/%m/%Y %H:%M')}`\n"
                                         )
+                                        
                                         enviar = envia_mensagem(mensagem_formatada)
                                         if enviar:
                                             ids_ja_processados.add(msg_id) 
@@ -457,10 +447,11 @@ def main():
                                             print(f"Hora Recebida: {msg_date_sp.strftime('%Y-%m-%d %H:%M:%S')}")
                                             print(f"Número da Viagem: {numero_viagem}")
                                             emails_novos_inseridos += 1
+                                            
                                         time.sleep(random.uniform(1, 3)) # Delay aleatório entre envios
 
                                     except sqlite3.Error as sql_e:
-                                        print(f"ERRO SQLITE ao inserir {msg_id}: {sql_e}")
+                                        print(f"❌ ERRO SQLITE ao inserir {msg_id}: {sql_e}")
                                 else:
                                     print(f"Ignorando {msg_id}: Tabela encontrada, mas formato inesperado (não tem 6 colunas).")
                             else:
