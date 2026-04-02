@@ -1,110 +1,64 @@
 services:
-  evolution_db:
-    image: postgres:15-alpine
-    container_name: evolution_db
+  # Redis exclusivo para a aplicação Spots (não interfere em outros sistemas)
+  spots_redis:
+    image: redis:alpine
+    container_name: spots_redis
     restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: SenhaSegura123
-      POSTGRES_DB: evolutiondb
-    ports:
-      - "5432"
+    command: redis-server --appendonly yes
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - spots_redis_data:/data
     networks:
-      - evolution-net
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  evolution_redis:
-    image: redis:latest
-    container_name: redis
-    command: >
-      redis-server --port 6379 --appendonly yes
-    volumes:
-      - evolution_redis:/data
-    networks:
-      - evolution-net
+      - spots-net
     ports:
-      - "6379"
+      - "6379:6379"
 
-  evolution_api:
-    image: evoapicloud/evolution-api:v2.3.6
-    container_name: evolution_api
-    restart: always
-    ports:
-      - "8080:8080"
-    depends_on:
-      evolution_db:
-        condition: service_healthy
-    environment:
-      AUTHENTICATION_API_KEY: "Senh@Segura123"
-      DATABASE_ENABLED: "true"
-      DATABASE_PROVIDER: "postgresql"
-      DATABASE_URL: "postgresql://postgres:SenhaSegura123@evolution_db:5432/evolutiondb"
-      DATABASE_CONNECTION_URI: "postgresql://postgres:SenhaSegura123@evolution_db:5432/evolutiondb"  # 👈 NOVO
-      DATABASE_SAVE_DATA_INSTANCE: "true"
-      DATABASE_SAVE_DATA_NEW_MESSAGE: "true"
-      DATABASE_SAVE_MESSAGE_UPDATE: "true"
-      DATABASE_SAVE_DATA_CONTACTS: "true"
-      DATABASE_SAVE_DATA_CHATS: "true"
-      DATABASE_SAVE_DATA_LABELS: "true"
-      DATABASE_SAVE_DATA_HISTORIC: "true"
-      CACHE_REDIS_ENABLED: "true"
-      CACHE_REDIS_URI: "redis://evolution_redis:6379/6"
-      CACHE_REDIS_PREFIX_KEY: "evolution"
-      CACHE_REDIS_SAVE_INSTANCES: "false"
-      CACHE_LOCAL_ENABLED: "false"
-      CACHE_WA_GROUPS: "true"
-      WEBHOOK_GLOBAL_URL: "http://host.docker.internal:3000/webhook"
-      CONFIG_SESSION_PHONE_VERSION: "2.3000.1028401180"
-    volumes:
-      - evolution_instances:/evolution/instances
-    networks:
-      - evolution-net
-
-  spots_app:
-    container_name: spots_app
+  # Painel Web Flask
+  spots_web:
+    container_name: spots_web
     build:
       context: .
       dockerfile: Dockerfile
     image: willianmoura3zx/spots:1.0
+    command: python app.py
     restart: always
     ports:
       - "5000:5000"
     depends_on:
-      - evolution_api
+      - spots_redis
     environment:
-      # Flask config
       SECRET_KEY: ${SECRET_KEY:-VHovuUGvuovY8vUHv088yv0v80Vhougv97TV07g}
       FLASK_DEBUG: ${FLASK_DEBUG:-False}
       FLASK_HOST: "0.0.0.0"
       FLASK_PORT: "5000"
-      # Admin credentials
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      # Aponta para o Redis local deste docker-compose
+      REDIS_URL: ${REDIS_URL}
+    networks:
+      - spots-net
+
+  # Monitor rodando em background
+  spots_monitor:
+    container_name: spots_monitor
+    image: willianmoura3zx/spots:1.0
+    command: python -u monitor_leiloes.py
+    restart: always
+    depends_on:
+      - spots_redis
+    environment:
+      REDIS_URL: ${REDIS_URL}
+      EVOLUTION_API_URL: ${EVOLUTION_API_URL}
     volumes:
-      # Monta arquivos de credenciais (devem existir no host)
       - ./credentials.json:/app/credentials.json:ro
       - ./credentials_sheets.json:/app/credentials_sheets.json:ro
-      - ./evolution.env:/app/evolution.env:ro
-      # Monta arquivo de config (será atualizado pela interface)
-      - ./origens_config.json:/app/origens_config.json
-      # Persiste token OAuth e banco de dados
       - ./token.json:/app/token.json
-      - ./viagens.db:/app/viagens.db
     networks:
-      - evolution-net
+      - spots-net
 
 volumes:
-  evolution_instances:
-  postgres_data:
-  evolution_redis:
+  spots_redis_data:
 
 networks:
-  evolution-net:
-    name: evolution-net
+  spots-net:
+    name: spots-net
     driver: bridge
