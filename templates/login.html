@@ -153,6 +153,9 @@
         {% endwith %}
         
         <form method="post">
+          <!-- Campo oculto para o token CSRF -->
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          
           <div class="form-group">
             <label for="username">Usuário</label>
             <input type="text" name="username" id="username" required autofocus autocomplete="username">

@@ -9,8 +9,6 @@ services:
       - spots_redis_data:/data
     networks:
       - spots-net
-    ports:
-      - "6379:6379"
 
   # Painel Web Flask
   spots_web:

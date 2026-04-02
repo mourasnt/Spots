@@ -386,7 +386,10 @@
     </section>
     
     <form method="post" id="saveForm">
+      <!-- Campo oculto para o token CSRF -->
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
       <input type="hidden" name="origens" id="origensHidden">
+      
       <div class="save-button-container">
         <button type="submit" class="btn-save">💾 Salvar Alterações</button>
       </div>
